@@ -1,15 +1,9 @@
-﻿using System.Collections;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json.Serialization;
-using CUE4Parse;
+
 using CUE4Parse.FileProvider;
-using CUE4Parse.FileProvider.Vfs;
 using CUE4Parse.UE4.Assets;
-using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Versions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace CUE4ParseHelper
 {
@@ -65,15 +59,20 @@ namespace CUE4ParseHelper
 		
 		public static void Initialize()
 		{
+			// NOTE: This file should be in your .exe's folder.
+			// Per ZlibHelper.DOWNLOAD_URL, it can be downloaded from:
+			// https://github.com/NotOfficer/Zlib-ng.NET/releases/download/1.0.0/zlib-ng2.dll
+			// I do not feel comfortable auto-downloading it here, though it's likely perfectly safe from the above URL.
+			
 			CUE4Parse.Compression.ZlibHelper.Initialize("zlib-ng2.dll");
 		}
 
 		// Fields
 
-		protected string _path = "";
-		protected DefaultFileProvider? _files;
-		protected EGame _version;
 		protected Dictionary<string, UEAPackage> _cachedPackages = [];
+		protected DefaultFileProvider? _files;
+		protected string _path = "";
+		protected EGame _version;
 
 		// Properties
 		
@@ -111,6 +110,8 @@ namespace CUE4ParseHelper
 				archive.Mount();
 				
 				/*
+				Unused calls for decrypting encrypted assets and loading alternate language localization data for StringTables, etc.:
+
 				archive.SubmitKey(new CUE4Parse.UE4.Objects.Core.Misc.FGuid(), new CUE4Parse.Encryption.Aes.FAesKey("0x" + new string('0', 64)));
 				archive.PostMount();
 				archive.LoadLocalization();

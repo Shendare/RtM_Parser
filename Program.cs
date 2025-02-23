@@ -225,6 +225,7 @@ namespace RtM_Parser
 
 			ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
+			// If you get an error about zlib-ng2.dll missing, see this method:
 			UEGameFiles.Initialize();
 
 			Console.Write("Opening game files...");

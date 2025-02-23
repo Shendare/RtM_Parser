@@ -1,29 +1,18 @@
-﻿using CUE4Parse.MappingsProvider;
-using CUE4Parse.MappingsProvider.Usmap;
+﻿using System.Buffers;
+using System.Collections;
+using System.Diagnostics;
+
 using CUE4Parse.UE4;
-using CUE4Parse.UE4.Assets;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Assets.Objects.Properties;
-using CUE4Parse.UE4.Kismet;
 using CUE4Parse.UE4.Objects.Core.i18N;
 using CUE4Parse.UE4.Objects.Core.Math;
-using CUE4Parse.UE4.Objects.GameplayTags;
-using CUE4Parse.UE4.Objects.UObject;
-using K4os.Compression.LZ4.Streams.Adapters;
-using Org.BouncyCastle.Asn1.X509;
-using System.Buffers;
-using System.Collections;
-using System.Diagnostics;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Xml.Linq;
-using System.Collections.Generic;
 using CUE4Parse.UE4.Objects.Core.Misc;
-using CUE4Parse.UE4.Objects.Niagara;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using CUE4Parse.UE4.Objects.Engine.Curves;
-
+using CUE4Parse.UE4.Objects.GameplayTags;
+using CUE4Parse.UE4.Objects.Niagara;
+using CUE4Parse.UE4.Objects.UObject;
 
 namespace CUE4ParseHelper
 {
@@ -32,29 +21,34 @@ namespace CUE4ParseHelper
 	public class UEAData : IEnumerable<UEAData>
 	{
 		// Statics
+
 		public static readonly IEnumerable<UEAData> NotFound = [];
+
 		public static string FloatFormat { get; set; } = "0.0#######";
 
 		// Fields
+
 		protected long _highestKeyNum = -1;
 
 		public readonly Dictionary<string, UEAData> Data = [];
 
-		public UEAData? Parent { get; set; }
-
 		// Properties
-		public string Name { get; set; }
 
 		public int Count { get => Data.Count; }
-		
+
 		public string DataType { get; set; }
 
 		public bool IsArray { get; set; }
 
+		public string Name { get; set; }
+
+		public UEAData? Parent { get; set; }
+
 		public UEADataValue Value { get; set; }
 
 		// Constructors
-		public UEAData(string name, string dataType)
+
+		public UEAData(string name = "", string dataType = "")
 		{
 			Name = name;
 			DataType = dataType;
@@ -75,9 +69,8 @@ namespace CUE4ParseHelper
 			ParseCUE4Object(name, dataType, value);
 		}
 
-		public UEAData() : this("", "") { }
-
 		// Indexers
+
 		public UEAData? this[string name]
 		{
 			get
@@ -158,15 +151,16 @@ namespace CUE4ParseHelper
 			}
 		}
 
+		// Methods
+
+		public void Add(UEAData data) { if (data.Name != null) { this[data.Name] = data; } }
+
 		/// <summary>Traverses a node path to find the descendant Data
 		/// </summary>
 		/// <param name="dataPath">Node path (e.g., "Field.Child.ArrayChild.0.Descendant")</param>
 		/// <example>Find("Field.Child.ArrayChild.0.Descendant")</example>
 		/// <returns>The descendant Data if found; otherwise null</returns>
-		public UEAData? Find(string dataPath)
-		{
-			return Find(dataPath.Split('.'), 0);
-		}
+		public UEAData? Find(string dataPath) => Find(dataPath.Split('.'), 0);
 
 		public UEAData? Find(string[] dataPath, int position)
 		{
@@ -184,7 +178,7 @@ namespace CUE4ParseHelper
 				// We didn't find a Data with the exact name
 				if (name.EndsWith(']'))
 				{
-					// Looks like they sent an array-style reference. Need to parse it into a child path.
+					// Looks like they sent an array-style reference (e.g., "Field.ArrayChild[5].Property"). Need to parse it into a child path.
 
 					int indexStart = name.IndexOf('[');
 					string childName = name.Substring(indexStart + 1, name.Length - indexStart - 2);
@@ -216,9 +210,6 @@ namespace CUE4ParseHelper
 				return next?.Find(dataPath, position);
 			}
 		}
-
-		// Methods
-		public void Add(UEAData data) { if (data.Name != null) { this[data.Name] = data; } }
 
 		public UEAExport? GetExport()
 		{
@@ -280,13 +271,6 @@ namespace CUE4ParseHelper
 			if (property == null) { return; }
 			string propertyType = propertyDataType ?? DataType;
 
-			if (name == "InitialRepairCost")
-			{
-				propertyType = propertyType; // Breakpoint spot for inspecting code path for particular asset property nodes
-			}
-
-			//UEAData? newData;
-
 			switch (property)
 			{
 				case StructProperty structData:
@@ -295,7 +279,6 @@ namespace CUE4ParseHelper
 					IUStruct? child = structData.Value?.StructType;
 					if (child != null)
 					{
-						//Add(new(name, propertyType, child));
 						ParseCUE4Object(name, propertyType, child);
 					}
 					break;
@@ -339,17 +322,17 @@ namespace CUE4ParseHelper
 					}
 					break;
 				case ObjectProperty objectProp:
-					if (objectProp.Value != null)
-					{
-						//Add(new(name, propertyType, objectProp.Value));
-						ParseCUE4Object(name, propertyType, objectProp.Value);
-					}
+					ParseCUE4Object(name, propertyType, objectProp.Value);
 					break;
 				case FPackageIndex objectRef:
 					Add(new("PackageIndex", "Int", objectRef.Index));
 					Add(new("PackageIndexType", "String", objectRef.IsImport ? "Import" : objectRef.IsExport ? "Export" : "Unknown"));
 
-					// Note: Don't try to step into or over this. It tries to load packages on another thread and crashes with an uncatchable exception.
+					// Unfortunately, CUE4Parse appears to hide the ImportMap and other necessary information to parse the FPackageIndex without resolving the object.
+					// So we have to resolve it first, which means it gets loaded and CUE4Parsed from whatever package it's in elsewhere in the game files, just to get the asset filename and import/export name.
+
+					// Note: Don't try to step into or over this line. It tries to load packages on another thread and crashes with an exception.
+					// Have to make a Breakpoint on the next line and Continue.
 					var refObject = objectRef.ResolvedObject;
 					if (refObject != null)
 					{
@@ -362,47 +345,35 @@ namespace CUE4ParseHelper
 						}
 						Add(new("ObjectClass", "String", refObjectClassName));
 						Add(new("ObjectAsset", "String", refObject.Outer?.Name.Text ?? ""));
-						//Value.String = refObject.Name.Text;
 					}
 					break;
 				case ByteProperty byteProp:
-					//Add(new(name, propertyType, byteProp.Value));
 					Value.UInt = byteProp.Value;
 					break;
 				case IntProperty intProp:
-					//Add(new(name, propertyType, intProp.Value));
 					Value.Int = intProp.Value;
 					break;
 				case UInt16Property uint16Prop:
-					//Add(new(name, propertyType, uint16Prop.Value));
 					Value.UInt = uint16Prop.Value;
 					break;
 				case byte ibyte:
 					Value.UInt = ibyte;
 					break;
 				case FloatProperty floatProp:
-					//Add(new(name, propertyType, floatProp.Value));
 					Value.Float = floatProp.Value;
 					break;
 				case StrProperty stringProp:
-					//Add(new(name, propertyType, stringProp.Value ?? ""));
 					Value.String = stringProp.Value ?? "";
 					break;
 				case BoolProperty boolProp:
-					//Add(new(name, propertyType, boolProp.Value ? "true" : "false"));
 					Value.String = boolProp.Value ? "true" : "false";
 					break;
 				case EnumProperty enumProp:
-					//Add(new(name, propertyType, enumProp.Value.Text));
 					Value.String = enumProp.Value.Text;
 					break;
 				case ArrayProperty arrayProp:
 					UScriptArray? array = arrayProp.Value;
-					if (array != null)
-					{
-						//Add(new(name, propertyType, array));
-						ParseCUE4Object(name, propertyType, array);
-					}
+					ParseCUE4Object(name, propertyType, array);
 					break;
 				case UScriptArray scriptArrayProp:
 					IsArray = true;
@@ -410,16 +381,14 @@ namespace CUE4ParseHelper
 					if (arrayElementType == "Unknown") { Debugger.Break(); }
 					foreach (FPropertyTagType element in scriptArrayProp.Properties)
 					{
-						// Setting as "" and adding the name at data insertion doesn't work when sub-properties need a name for this object.
+						// Leaving as "" and generating the index-based name at array insertion doesn't work when sub-properties need a name for this object.
 						Add(new(Count.ToString(), arrayElementType, element));
 					}
 					break;
 				case SoftObjectProperty softobjProp:
-					//Add(new(name, propertyType, softobjProp.Value.AssetPathName.Text)); // FName
 					Value.String = softobjProp.Value.AssetPathName.Text;
 					break;
 				case MapProperty mapProp:
-					//newData = new(name, propertyType);
 					var map = mapProp.Value;
 					if (map != null)
 					{
@@ -428,7 +397,6 @@ namespace CUE4ParseHelper
 							Add(new(mapEntry.Key.ToString(), "MapValue<" + mapEntry.Key.GetType().ToString() + "," + (mapEntry.Value?.GetType().ToString() ?? null) + ">", mapEntry.Value?.ToString() ?? ""));
 						}
 					}
-					//Add(newData);
 					break;
 				case FieldPathProperty fieldPathProp:
 					FFieldPath? path = fieldPathProp.Value;
@@ -443,8 +411,6 @@ namespace CUE4ParseHelper
 					}
 					break;
 				case SetProperty setProp:
-					//newData = new(name, propertyType);
-					//newData.IsArray = true;
 					IsArray = true;
 					UScriptSet? set = setProp.Value;
 					if (set?.Properties.Count > 0)
@@ -457,19 +423,15 @@ namespace CUE4ParseHelper
 						}
 						foreach (FPropertyTagType element in set.Properties)
 						{
-							//newData.ParseCUE4Object("", setElementType, element);
 							Add(new("", setElementType, element));
 						}
 					}
-					//Add(newData);
 					break;
 				case AbstractPropertyHolder fStruct:
-					// Come back here
 					foreach (var structProperty in fStruct.Properties)
 					{
 						if (structProperty.Tag != null)
 						{
-							//ParseCUE4Object(structProperty.Name.Text, structProperty.Tag, structProperty.TagData?.ToString());
 							Add(new(structProperty.Name.Text, structProperty.TagData?.ToString() ?? "StructProperty", structProperty.Tag));
 						}
 					}
@@ -478,11 +440,9 @@ namespace CUE4ParseHelper
 					ParseCUE4Object(fProperty.Name.Text, fProperty.TagData?.ToString(), fProperty.Tag);
 					break;
 				case FPropertyTagType fPropertyType:
-					//Value.Object = fPropertyType.GenericValue;
 					ParseCUE4Object(name, propertyDataType, fPropertyType.GenericValue);
 					break;
 				case FScriptStruct fsStruct:
-					//Value.Object = fsStruct.StructType;
 					ParseCUE4Object(name, propertyDataType, fsStruct.StructType);
 					break;
 				case FGameplayTagContainer gameTags:
@@ -498,13 +458,12 @@ namespace CUE4ParseHelper
 					Add(new("B", "Float", linearColor.B));
 					Add(new("A", "Float", linearColor.A));
 					Value.String = linearColor.Hex;
-					//Add(new("Hex", "String", linearColor.Hex));
 					break;
 				case FSoftObjectPath softObjProp:
-					//Add(new("Path", "SoftObjectPath", softObjProp.AssetPathName.Text));
 					Value.String = softObjProp.AssetPathName.Text;
 					break;
 				case FName fName:
+					Add(new("NameIndex", "Int", fName.Index));
 					Value.String = fName.Text;
 					break;
 				case FGuid guid:
@@ -586,6 +545,7 @@ namespace CUE4ParseHelper
 		IEnumerator IEnumerable.GetEnumerator() => Data.Values.GetEnumerator();
 
 		// Conversions
+
 		public static implicit operator string(UEAData Data) => Data?.ToString() ?? "";
 	}
 
@@ -736,6 +696,8 @@ namespace CUE4ParseHelper
 						return _valueString;
 					case Type.Int:
 						return _valueInt;
+					case Type.UInt:
+						return _valueUInt;
 					case Type.Float:
 						return _valueFloat;
 				}

@@ -1,20 +1,7 @@
-﻿using CUE4Parse.UE4.Assets;
-using CUE4Parse.UE4.Assets.Exports;
-using CUE4Parse.UE4.Assets.Exports.Engine;
-using CUE4Parse.UE4.Assets.Exports.Internationalization;
-using CUE4Parse.UE4.IO.Objects;
-using CUE4Parse.UE4.Objects.UObject;
+﻿using System.Diagnostics.CodeAnalysis;
 
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Metadata;
-using System.Text;
-using System.Threading.Tasks;
+using CUE4Parse.UE4.Assets;
+using CUE4Parse.UE4.Objects.UObject;
 
 namespace CUE4ParseHelper
 {
@@ -29,6 +16,7 @@ namespace CUE4ParseHelper
 		public IPackage? UEPackage { get; }
 
 		// Constructors
+
 		public UEAPackage(UEGameFiles game, IPackage package)
 		{
 			UEPackage = package;
@@ -68,6 +56,12 @@ namespace CUE4ParseHelper
 		}
 
 		// Methods
+
+		/// <summary>Looks for a property that may only exist in a parent asset that this object inherits from
+		/// </summary>
+		/// <param name="exportName">Name of the export to search in from this and inherited asset packages</param>
+		/// <param name="dataPath">Path to the data field you need (e.g., "RepairMaterials.MaterialHandle.RowName")</param>
+		/// <returns><see cref="UEAData" /> object if found, otherwise <see langword="null"/></returns>
 		public UEAData? FindInheritableData(string exportName, string dataPath)
 		{
 			UEAData? result;
@@ -145,7 +139,6 @@ namespace CUE4ParseHelper
 			}
 			else
 			{
-				//export = this["Exports"]?[name] as UEAExport;
 				export = this["Exports"]?[name] as UEAExport;
 				return (export != null);
 			}
@@ -167,6 +160,5 @@ namespace CUE4ParseHelper
 		{
 			return Name + ": " + (UEPackage?.GetType().ToString() ?? "Empty IPackage") + " (" + (this["Exports"]?.Count ?? 0) + " Exports)";
 		}
-
 	}
 }

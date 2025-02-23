@@ -1,16 +1,9 @@
-﻿using CUE4Parse;
-using CUE4Parse.UE4.Assets.Exports;
+﻿using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Assets.Exports.Engine;
 using CUE4Parse.UE4.Assets.Exports.Internationalization;
 using CUE4Parse.UE4.Assets.Objects;
-using CUE4Parse.UE4.Assets.Objects.Properties;
-using CUE4Parse.UE4.Kismet;
 using CUE4Parse.UE4.Objects.Engine;
 using CUE4Parse.UE4.Objects.UObject;
-using Newtonsoft.Json;
-using System.Collections;
-using System.Data;
-using System.Diagnostics;
 
 namespace CUE4ParseHelper
 {
@@ -119,7 +112,6 @@ namespace CUE4ParseHelper
 
 		public override string ToString()
 		{
-			//return Name + ": " + ExportType.ToString() + " (" + Data.DataType + ") [" + Data.Count + ']';
 			return Name + ": " + ExportType.ToString() + " [" + (Data["Data"]?.Count ?? 0) + ']';
 		}
 
