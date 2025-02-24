@@ -23,7 +23,7 @@ namespace RtM_Parser
 		const string GameItemsPath = @"/Game/Tech/Data/Items/";
 		const string GameItemsList = "Items,Armor,Brews,Consumables,ContainerItems,EpicPacks,Ores,RecipeFragments,Runes,Storage,ThresholdEffects,ThrowLights,Tools,Weapons,Fuels,ItemRecipes,ItemSets";
 		const string ConstructionsPath = @"/Game/Tech/Data/Building/";
-		
+
 		// Items that don't have recipes, but are still obtainable in-game and thus eligible for exporting
 		static readonly HashSet<string> GameObjectWhitelist = [
 			"RareMushroom",
@@ -50,7 +50,7 @@ namespace RtM_Parser
 			"Thyme",
 			"WhiteBeans",
 		];
-		
+
 		// Internal/Abandoned recipes or items that are not obtainable in-game whether in Campaign or Sandbox mode
 		// If something is added to the game later, it can simply be removed from this list and it will be exported
 		static readonly HashSet<string> GameObjectBlacklist = [
@@ -151,30 +151,44 @@ namespace RtM_Parser
 			"Scaffolding_Platform_Open"
 		];
 
+		static readonly Dictionary<string, string> CustomStringTableEntries = new() {
+			{ "Damage.Piercing.Spear", "Spear" },
+			{ "Damage.Slashing.Sword.1h", "Slashing" },
+			{ "Damage.Slashing.Axe.1h", "Slashing" },
+			{ "Damage.Bludgeon.Hammer.1h", "Bludgeon" },
+			{ "Damage.Slashing.Axe.2h", "Slashing" },
+			{ "Damage.Slashing.Halberd", "Slashing" },
+			{ "Damage.Bludgeon.Hammer.2h", "Bludgeon" },
+			{ "Damage.Slashing.Sword.2h", "Slashing" },
+			{ "Damage.Piercing.Pickaxe", "Pickaxe" },
+			{ "Damage.Piercing.Arrow", "Piercing" },
+			{ "Damage.Piercing.Bolt", "Piercing" }
+		};
+
 		// Not all data sets have relevant information for exporting.
 		// Remove InternalName/ConstructionHandle fields when done debugging.
 		static readonly Dictionary<ItemType, string> ItemFieldOrder = new() {
-			//{ ItemType.None, "Name,InternalName,Tags,Description" },
-			{ ItemType.Armor, "Name,InternalName,Tags,Description,Tier,Durability,Armor Protection,Armor Effectiveness,Repair Cost,Damage Modifiers,Effects" },
-			{ ItemType.Brew, "Name,InternalName,Description,Effect" },
-			{ ItemType.Consumable, "Name,InternalName,Tags,Description,Stack Size,Spoil Time,Restore Hunger,Restore Health,Restore Energy,Meal Time,Effect,Meal Buffs" },
-			//{ ItemType.ContainerItem, "Name,InternalName,Tags,Description" },
-			//{ ItemType.EpicPack, "Name,InternalName,Tags,Description" },
+			//{ ItemType.None, "Name,Tags,Description" },
+			{ ItemType.Armor, "Name,Tags,Description,Tier,Durability,Armor Protection,Armor Effectiveness,Repair Cost,Damage Modifiers,Effects" },
+			{ ItemType.Brew, "Name,Description,Effect" },
+			{ ItemType.Consumable, "Name,Tags,Description,Stack Size,Spoil Time,Restore Hunger,Restore Health,Restore Energy,Meal Time,Effect,Meal Buffs" },
+			{ ItemType.ContainerItem, "Name,Tags,Description" },
+			{ ItemType.EpicPack, "Name,Tags,Description" },
 			{ ItemType.Fuel, "Name,Fuel Value" },
-			{ ItemType.ItemRecipe, "Name,InternalName,Quantity,Craft Time,Stations,Materials,Support,Unlock,Materials Sandbox(*),Support Sandbox(*),Unlock Sandbox (* if different)" },
-			//{ ItemType.Item, "Name,InternalName,Tags,Description" },
-			{ ItemType.ItemSet, "Name,InternalName,Tags,Description" },
-			//{ ItemType.Ore, "Name,InternalName,Tags,Description" },
-			//{ ItemType.RecipeFragment, "Name,InternalName,Tags,Description" },
-			{ ItemType.Rune, "Name,InternalName,Tags,Description" },
-			//{ ItemType.Storage, "Name,InternalName,Tags,Description" },
+			{ ItemType.ItemRecipe, "Name,Quantity,Craft Time,Stations,Materials,Support,Unlock,Materials Sandbox(*),Support Sandbox(*),Unlock Sandbox (* if different)" },
+			{ ItemType.Item, "Name,Tags,Description" },
+			{ ItemType.ItemSet, "Name,Tags,Description" },
+			{ ItemType.Ore, "Name,Tags,Description" },
+			{ ItemType.RecipeFragment, "Name,Tags,Description" },
+			{ ItemType.Rune, "Name,Tags,Description" },
+			{ ItemType.Storage, "Name,Tags,Description" },
 			//{ ItemType.ThresholdEffect, "Name,InternalName,Tags,Description" },
-			{ ItemType.ThrowLight, "Name,InternalName,Tags,Description" },
-			{ ItemType.Tool, "Name,InternalName,Tags,Description" },
-			{ ItemType.Weapon, "Name,InternalName,Tags,Description" },
-			{ ItemType.Effect, "Name,InternalName,Tags,Description" },
+			{ ItemType.ThrowLight, "Name,Tags,Description" },
+			{ ItemType.Tool, "Name,Tags,Description,Tier,Durability,Hit Strength,Repair Cost,Effects" },
+			{ ItemType.Weapon, "Name,Tags,Description,Tier,Durability,Damage Type,Damage,Speed,Armor Penetration,Block Damage Reduction,Repair Cost,Effects" },
+			{ ItemType.Effect, "Name,Tags,Description" },
 			//{ ItemType.Construction, "Name,InternalName,Tags,Description" },
-			{ ItemType.ConstructionRecipe, "Name,InternalName,ConstructionHandle,Tags,Durability,HorizStabilityDist,Description,Materials,Unlock,Materials Sandbox(*),Unlock Sandbox (* if different)" },
+			{ ItemType.ConstructionRecipe, "Name,Tags,Durability,HorizStabilityDist,Description,Materials,Unlock,Materials Sandbox(*),Unlock Sandbox (* if different)" },
 			//{ ItemType.ConstructionStability, "Name,InternalName,Tags,Description" }
 		};
 
@@ -385,6 +399,18 @@ namespace RtM_Parser
 							}
 						}
 
+						// Second way that item Tiers are stored:
+						if (tierNum == "")
+						{
+							int tierNumInt = dtItem["Tier"]?.Value.Int ?? 0;
+
+							if (tierNumInt > 0)
+							{
+								tierNum = tierNumInt.ToString();
+								categoryTags.Add(LookupString("WeaponTier.Format", "UI")?.Replace("{n}", LookupString("WeaponTier." + tierNum, "UI") ?? "?") ?? ("Tier " + LookupString("WeaponTier." + tierNum, "UI") ?? tierNum));
+							}
+						}
+
 						newItem["Tier"] = tierNum;
 						newItem["Tags"] = string.Join(", ", categoryTags);
 
@@ -489,6 +515,7 @@ namespace RtM_Parser
 			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
 			itemEffect.Clear();
 
+			/* Don't bother to read Actor data until I can parse the Effects
 			if (Game.GetExportData(fields["Actor"]!, out var bpData, ""))
 			{
 				newItem["Armor"] = fields["ArmorValue"] ?? "";
@@ -508,9 +535,8 @@ namespace RtM_Parser
 					firstItemEffect = false;
 				}
 			}
+			*/
 
-			//itemEffect.Clear();
-			//firstItemEffect = true;
 			foreach (var effect in fields["EquipEffects"] ?? NotFound)
 			{
 				itemEffect.Add((firstItemEffect ? "OnEquip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
@@ -963,10 +989,144 @@ namespace RtM_Parser
 
 		static void LoadItem_Tool(Dictionary<string, string> newItem, UEAData fields)
 		{
+			newItem["Durability"] = fields["Durability"] ?? "";
+			newItem["Durability Decay"] = fields["DurabilityDecayWhileEquipped"] ?? "";
+			newItem["Stamina Cost"] = fields["StaminaCost"] ?? "";
+			newItem["Energy Cost"] = fields["EnergyCost"] ?? "";
+			newItem["Hit Strength"] = fields["CarveHits"] ?? "";
+
+			var repairField = fields["InitialRepairCost"]?.GetFirst();
+			string repairText = repairField?["Count"] ?? "";
+			if (repairText != "")
+			{
+				string repairMaterial = LookupString(repairField?["MaterialHandle.RowName"]!);
+
+				if (repairMaterial != "")
+				{
+					repairText += ' ' + repairMaterial;
+				}
+			}
+			newItem["Repair Cost"] = repairText;
+
+			List<string> itemEffects = [];
+			List<string> itemEffect = [];
+			bool firstItemEffect = true;
+
+			foreach (var effect in fields["VisibleEffects"] ?? NotFound)
+			{
+				itemEffect.Add((firstItemEffect ? "Visible: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+				firstItemEffect = false;
+			}
+			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
+
+			/* Don't bother to read Actor data until I can parse the Effects
+			if (Game.GetExportData(fields["Actor"]!, out var bpData, ""))
+			{
+				List<string> tags = [];
+				foreach (var tag in bpData["TagsToApplyWhileEquipped"] ?? NotFound)
+				{
+					tags.Add(tag);
+				}
+				newItem["EquipTags"] = string.Join(", ", tags);
+
+				firstItemEffect = true;
+				itemEffect.Clear();
+				foreach (var effect in bpData["Effects"] ?? NotFound)
+				{
+					itemEffect.Add((firstItemEffect ? "OnEquip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+					firstItemEffect = false;
+				}
+			}
+			*/
+
+			foreach (var effect in fields["EquipEffects"] ?? NotFound)
+			{
+				itemEffect.Add((firstItemEffect ? "OnEquip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+				firstItemEffect = false;
+			}
+			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
+
+			itemEffect.Clear();
+			firstItemEffect = true;
+			foreach (var effect in fields["HolsterEffects"] ?? NotFound)
+			{
+				itemEffect.Add((firstItemEffect ? "OnUnequip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+				firstItemEffect = false;
+			}
+			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
+
+			newItem["Effects"] = string.Join(", ", itemEffects);
+
+			newItem["ItemSet"] = fields["ItemSetRowHandle.RowName"] ?? "";
 		}
 
 		static void LoadItem_Weapon(Dictionary<string, string> newItem, UEAData fields)
 		{
+			newItem["Durability"] = fields["Durability"] ?? "";
+			newItem["Damage"] = fields["Damage"] ?? "";
+			newItem["Damage Type"] = LookupString(fields["DamageType.TagName"] ?? "");
+			newItem["Speed"] = fields["Speed"] ?? "";
+			newItem["Armor Penetration"] = fields["ArmorPenetration"] ?? "";
+			newItem["Stamina Cost"] = fields["StaminaCost"] ?? "";
+			newItem["Energy Cost"] = fields["EnergyCost"] ?? "";
+			newItem["Block Damage Reduction"] = fields["BlockDamageReduction"] ?? "";
+
+			var repairField = fields["InitialRepairCost"]?.GetFirst();
+			string repairText = repairField?["Count"] ?? "";
+			if (repairText != "")
+			{
+				string repairMaterial = LookupString(repairField?["MaterialHandle.RowName"]!);
+
+				if (repairMaterial != "")
+				{
+					repairText += ' ' + repairMaterial;
+				}
+			}
+			newItem["Repair Cost"] = repairText;
+
+			List<string> itemEffects = [];
+			List<string> itemEffect = [];
+			bool firstItemEffect = true;
+
+			foreach (var effect in fields["VisibleEffects"] ?? NotFound)
+			{
+				itemEffect.Add((firstItemEffect ? "Visible: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+				firstItemEffect = false;
+			}
+			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
+
+			/* Don't bother to read Actor data until I can parse the Effects
+			if (Game.GetExportData(fields["Actor"]!, out var bpData, ""))
+			{
+				firstItemEffect = true;
+				itemEffect.Clear();
+				foreach (var effect in bpData["Effects"] ?? NotFound)
+				{
+					itemEffect.Add((firstItemEffect ? "OnEquip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+					firstItemEffect = false;
+				}
+			}
+			*/
+
+			foreach (var effect in fields["EquipEffects"] ?? NotFound)
+			{
+				itemEffect.Add((firstItemEffect ? "OnEquip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+				firstItemEffect = false;
+			}
+			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
+
+			itemEffect.Clear();
+			firstItemEffect = true;
+			foreach (var effect in fields["HolsterEffects"] ?? NotFound)
+			{
+				itemEffect.Add((firstItemEffect ? "OnUnequip: " : "") + RegisterItemEffect(effect["ObjectName"]!, effect["ObjectAsset"]!));
+				firstItemEffect = false;
+			}
+			if (itemEffect.Count > 0) { itemEffects.Add(string.Join(", ", itemEffect)); }
+
+			newItem["Effects"] = string.Join(", ", itemEffects);
+
+			newItem["ItemSet"] = fields["ItemSetRowHandle.RowName"] ?? "";
 		}
 
 		static void LoadConstructionStabilities()
@@ -1564,6 +1724,11 @@ namespace RtM_Parser
 				foreach (string stringTable in stringTables)
 				{
 					LoadStringTables(stringTable);
+				}
+
+				foreach ((string key, string value) in CustomStringTableEntries)
+				{
+					CombinedStringTable[key] = value;
 				}
 			}
 			else

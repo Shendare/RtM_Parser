@@ -277,10 +277,7 @@ namespace CUE4ParseHelper
 					// StructProperties are objects with their own data
 					// [DebuggerDisplay("{Name,nq}: Struct")]
 					IUStruct? child = structData.Value?.StructType;
-					if (child != null)
-					{
-						ParseCUE4Object(name, propertyType, child);
-					}
+					ParseCUE4Object(name, propertyType, child);
 					break;
 				case NameProperty nameData:
 					// NameProperties contain text that's often repeated, so it gets stored as a pointer to an entry in the package's Name Map
